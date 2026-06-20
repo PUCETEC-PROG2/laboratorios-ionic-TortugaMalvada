@@ -8,7 +8,7 @@ const RepoItem: React.FC<any> = ({ ...repository }) => {
         <IonItemSliding>
             <IonItem>
                 <IonThumbnail slot="start">
-                <img src={repository.avatarUrl} alt="Avatar"/>
+                <img src={repository.owner.avatar_url} alt="Avatar"/>
                 </IonThumbnail>
                 <IonLabel>
                 <h2>{repository.name}</h2>
