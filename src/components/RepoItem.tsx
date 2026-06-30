@@ -1,5 +1,5 @@
 import './RepoItem.css';
-import React from 'react';
+import React, { useRef } from 'react';
 import {
   IonItemSliding,
   IonItem,
@@ -12,32 +12,45 @@ import {
 import { pencil, trash } from 'ionicons/icons';
 import { Repository } from '../interfaces/Repository';
 
-const RepoItem: React.FC<Repository> = ({
-  name,
-  description,
-  language,
-  owner
-}) => {
+interface RepoItemProps {
+  repo: Repository;
+  onEdit: (repo: Repository) => void;
+  onDelete: (repo: Repository) => void;
+}
+
+const RepoItem: React.FC<RepoItemProps> = ({ repo, onEdit, onDelete }) => {
+  const slidingRef = useRef<HTMLIonItemSlidingElement>(null);
+
+  const handleEdit = () => {
+    slidingRef.current?.close();
+    onEdit(repo);
+  };
+
+  const handleDelete = () => {
+    slidingRef.current?.close();
+    onDelete(repo);
+  };
+
   return (
-    <IonItemSliding>
+    <IonItemSliding ref={slidingRef}>
       <IonItem>
         <IonThumbnail slot="start">
-          <img src={owner.avatar_url} alt="Avatar" />
+          <img src={repo.owner.avatar_url} alt="Avatar" />
         </IonThumbnail>
 
         <IonLabel>
-          <h2>{name}</h2>
-          <p>{description}</p>
-          <p><strong>Lenguaje:</strong> {language}</p>
+          <h2>{repo.name}</h2>
+          <p>{repo.description || "Sin descripción"}</p>
+          {repo.language && <p><strong>Lenguaje:</strong> {repo.language}</p>}
         </IonLabel>
       </IonItem>
 
-      <IonItemOptions>
-        <IonItemOption>
+      <IonItemOptions side="end">
+        <IonItemOption onClick={handleEdit} color="primary">
           <IonIcon icon={pencil} slot="icon-only" />
         </IonItemOption>
 
-        <IonItemOption color="danger">
+        <IonItemOption color="danger" onClick={handleDelete}>
           <IonIcon icon={trash} slot="icon-only" />
         </IonItemOption>
       </IonItemOptions>

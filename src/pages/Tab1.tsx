@@ -2,30 +2,40 @@ import React, { useState } from 'react';
 import {
   IonContent,
   IonHeader,
-  IonIcon,
-  IonItem,
-  IonItemOption,
-  IonItemOptions,
-  IonItemSliding,
-  IonLabel,
   IonList,
   IonPage,
-  IonThumbnail,
   IonTitle,
   IonToolbar,
   useIonViewWillEnter,
+  useIonAlert,
+  IonModal,
+  IonButtons,
+  IonButton,
+  IonItem,
+  IonLabel,
+  IonInput,
+  IonTextarea
 } from "@ionic/react";
 
 import "./Tab1.css";
-import { pencil, trash } from "ionicons/icons";
-import { fetchRepositories } from "../services/GithunSevices";
+import { fetchRepositories, deleteRepository, updateRepository } from "../services/GithunSevices";
 import type { Repository } from "../interfaces/Repository";
 import LoginSpinner from "../components/LoginSpinner";
+import RepoItem from '../components/RepoItem';
 
 const Tab1: React.FC = () => {
   const [repositoryList, setRepositoryList] = useState<Repository[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [errorMsg, setErrorMsg] = useState<string>("");
+
+  // Controladores de Alertas de Ionic
+  const [presentAlert] = useIonAlert();
+
+  // Estados para el Modal de Edición
+  const [showModal, setShowModal] = useState<boolean>(false);
+  const [selectedRepo, setSelectedRepo] = useState<Repository | null>(null);
+  const [editName, setEditName] = useState<string>("");
+  const [editDescription, setEditDescription] = useState<string>("");
 
   const fetchRepos = async () => {
     setLoading(true);
@@ -45,6 +55,75 @@ const Tab1: React.FC = () => {
     fetchRepos();
   });
 
+  // --- Lógica para Eliminar ---
+  const handleDeleteTrigger = (repo: Repository) => {
+    presentAlert({
+      header: '¿Eliminar repositorio?',
+      message: `Esta acción eliminará de forma permanente ${repo.name}.`,
+      buttons: [
+        { text: 'Cancelar', role: 'cancel' },
+        {
+          text: 'Eliminar',
+          role: 'destructive',
+          handler: async () => {
+            setLoading(true);
+            try {
+              await deleteRepository(repo.owner.login, repo.name);
+              // Filtrar el estado local para removerlo visualmente sin recargar todo de la API
+              setRepositoryList(prev => prev.filter(r => r.id !== repo.id));
+            } catch (err) {
+              presentAlert({
+                header: 'Error',
+                message: (err as Error).message,
+                buttons: ['OK']
+              });
+            } finally {
+              setLoading(false);
+            }
+          }
+        }
+      ]
+    });
+  };
+
+  // --- Lógica para Abrir Modal de Edición ---
+  const handleEditTrigger = (repo: Repository) => {
+    setSelectedRepo(repo);
+    setEditName(repo.name);
+    setEditDescription(repo.description || "");
+    setShowModal(true);
+  };
+
+  // --- Guardar Edición ---
+  const handleSaveChanges = async () => {
+    if (!selectedRepo || !editName.trim()) return;
+
+    setLoading(true);
+    setShowModal(false);
+    try {
+      const updatedData = await updateRepository(selectedRepo.owner.login, selectedRepo.name, {
+        name: editName,
+        description: editDescription
+      });
+
+      // Actualizar la lista en el estado local en vez de hacer otro fetch masivo
+      setRepositoryList(prev => prev.map(r => r.id === selectedRepo.id ? { 
+        ...r, 
+        name: updatedData.name, 
+        description: updatedData.description 
+      } : r));
+
+    } catch (err) {
+      presentAlert({
+        header: 'Error al actualizar',
+        message: (err as Error).message,
+        buttons: ['OK']
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <IonPage>
       <IonHeader>
@@ -61,34 +140,52 @@ const Tab1: React.FC = () => {
         ) : (
           <IonList>
             {repositoryList.map((repo) => (
-              <IonItemSliding key={repo.id}>
-                <IonItem>
-                  <IonThumbnail slot="start">
-                    <img src={repo.owner.avatar_url} alt="Avatar" />
-                  </IonThumbnail>
-
-                  <IonLabel>
-                    <h2>{repo.name}</h2>
-                    <p>{repo.description}</p>
-                    <p>
-                      <strong>Lenguaje:</strong> {repo.language}
-                    </p>
-                  </IonLabel>
-                </IonItem>
-
-                <IonItemOptions side="end">
-                  <IonItemOption>
-                    <IonIcon icon={pencil} slot="icon-only" />
-                  </IonItemOption>
-
-                  <IonItemOption color="danger">
-                    <IonIcon icon={trash} slot="icon-only" />
-                  </IonItemOption>
-                </IonItemOptions>
-              </IonItemSliding>
+              <RepoItem 
+                key={repo.id} 
+                repo={repo} 
+                onEdit={handleEditTrigger} 
+                onDelete={handleDeleteTrigger} 
+              />
             ))}
           </IonList>
         )}
+
+        {/* MODAL DE EDICIÓN NATIVO DE IONIC */}
+        <IonModal isOpen={showModal} onDidDismiss={() => setShowModal(false)}>
+          <IonHeader>
+            <IonToolbar>
+              <IonTitle>Editar Repositorio</IonTitle>
+              <IonButtons slot="start">
+                <IonButton onClick={() => setShowModal(false)}>Cancelar</IonButton>
+              </IonButtons>
+              <IonButtons slot="end">
+                <IonButton strong={true} onClick={handleSaveChanges}>Guardar</IonButton>
+              </IonButtons>
+            </IonToolbar>
+          </IonHeader>
+          <IonContent className="ion-padding">
+            <IonItem fill="solid" className="ion-margin-bottom">
+              <IonLabel position="stacked">Nombre del repositorio</IonLabel>
+              <IonInput 
+                value={editName} 
+                onIonInput={(e) => setEditName(e.detail.value!)} 
+                type="text" 
+                placeholder="Nombre"
+              />
+            </IonItem>
+
+            <IonItem fill="solid">
+              <IonLabel position="stacked">Descripción</IonLabel>
+              <IonTextarea 
+                value={editDescription} 
+                onIonInput={(e) => setEditDescription(e.detail.value!)} 
+                placeholder="Escribe una descripción..."
+                rows={4}
+              />
+            </IonItem>
+          </IonContent>
+        </IonModal>
+
       </IonContent>
     </IonPage>
   );

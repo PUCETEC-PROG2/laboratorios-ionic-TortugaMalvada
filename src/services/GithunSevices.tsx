@@ -1,7 +1,7 @@
 import axios from 'axios';
-import type { Repository } from '../src/interfaces/Repository';
-import type { GithubUser } from '../src/interfaces/GithubUser';
-import type { RepositoryPayload } from '../src/interfaces/RepositoryPayload';
+import type { Repository } from '../interfaces/Repository';
+import type { GithubUser } from '../interfaces/GithubUser';
+import type { RepositoryPayload } from '../interfaces/RepositoryPayload';
 
 const GITHUB_API_URL = import.meta.env.VITE_GITHUB_API_URL as string | undefined;
 const GITHUB_API_TOKEN = import.meta.env.VITE_GITHUB_API_TOKEN as string | undefined;
@@ -29,7 +29,7 @@ export const fetchRepositories = async (): Promise<Repository[]> => {
         per_page: 100,
         sort: 'updated',
         direction: 'desc',
-        affiliation: 'owner,collaborator',
+        affiliation: 'owner', // Filtrado a owner para asegurar permisos de edición/borrado
         t: Date.now(),
       },
     });
@@ -64,5 +64,27 @@ export const fetchUserInfo = async (): Promise<GithubUser | null> => {
     return response.data;
   } catch (error) {
     throw new Error(`${(error as Error).message}`);
+  }
+};
+
+// --- NUEVA LÓGICA DE ELIMINAR ---
+export const deleteRepository = async (owner: string, repoName: string): Promise<boolean> => {
+  try {
+    const response = await apiClient.delete(`/repos/${owner}/${repoName}`);
+    return response.status === 204;
+  } catch (error) {
+    console.error('Error eliminando repositorio:', error);
+    throw new Error(`No se pudo eliminar el repositorio: ${(error as Error).message}`);
+  }
+};
+
+// --- NUEVA LÓGICA DE EDITAR (ACTUALIZAR) ---
+export const updateRepository = async (owner: string, currentRepoName: string, payload: RepositoryPayload): Promise<Repository> => {
+  try {
+    const response = await apiClient.patch(`/repos/${owner}/${currentRepoName}`, payload);
+    return response.data;
+  } catch (error) {
+    console.error('Error editando repositorio:', error);
+    throw new Error(`No se pudo editar el repositorio: ${(error as Error).message}`);
   }
 };
